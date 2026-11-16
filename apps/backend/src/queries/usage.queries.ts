@@ -1,6 +1,7 @@
 import type { LlmProvider } from '@nao/shared/types';
 import { and, eq, isNotNull, notInArray, or, SQL, sql, SQLWrapper, sum } from 'drizzle-orm';
 
+import { findKnownModel } from '../agents/provider-meta';
 import { LLM_PROVIDERS } from '../agents/providers';
 import s from '../db/abstractSchema';
 import { db } from '../db/db';
@@ -645,6 +646,14 @@ async function getCostLookupTuples(projectId: string): Promise<CostLookupTuple[]
 		}
 	}
 
+	for (const modelId of await getUsedBedrockModelIds(projectId)) {
+		const key = `bedrock\u0000${modelId}`;
+		const twin = costs.has(key) ? undefined : findKnownModel('bedrock', modelId);
+		if (twin) {
+			costs.set(key, { ...twin.costPerM });
+		}
+	}
+
 	for (const { provider, models } of await getProjectDeclaredModels(projectId)) {
 		for (const model of models) {
 			const key = `${provider}\u0000${model.id}`;
@@ -663,6 +672,25 @@ async function getCostLookupTuples(projectId: string): Promise<CostLookupTuple[]
 			cost.output ?? 0,
 		] satisfies CostLookupTuple;
 	});
+}
+
+/** Unlisted Bedrock geo ids a project has used; they are priced from their listed twin. */
+async function getUsedBedrockModelIds(projectId: string): Promise<string[]> {
+	const [messageRows, inferenceRows] = await Promise.all([
+		db
+			.selectDistinct({ modelId: s.chatMessage.llmModelId })
+			.from(s.chatMessage)
+			.innerJoin(s.chat, eq(s.chatMessage.chatId, s.chat.id))
+			.where(and(eq(s.chat.projectId, projectId), eq(s.chatMessage.llmProvider, 'bedrock')))
+			.execute(),
+		db
+			.selectDistinct({ modelId: s.llmInference.llmModelId })
+			.from(s.llmInference)
+			.where(and(eq(s.llmInference.projectId, projectId), eq(s.llmInference.llmProvider, 'bedrock')))
+			.execute(),
+	]);
+	const modelIds = [...messageRows, ...inferenceRows].map((row) => row.modelId);
+	return [...new Set(modelIds.filter((modelId): modelId is string => Boolean(modelId)))];
 }
 
 function tupleToValuesRow(tuple: CostLookupTuple): SQL {

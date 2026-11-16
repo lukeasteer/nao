@@ -1,14 +1,8 @@
 import { getCurrentPeriodStart, getNextPeriodStart } from '@nao/shared/date';
 import type { MemberBudgetSource } from '@nao/shared/member-budget';
-import {
-	type CalendarPeriod,
-	type LlmProvider,
-	providerKind,
-	providerLabel,
-	WARNING_BUDGET_THRESHOLD,
-} from '@nao/shared/types';
+import { type CalendarPeriod, type LlmProvider, providerLabel, WARNING_BUDGET_THRESHOLD } from '@nao/shared/types';
 
-import { PROVIDER_META } from '../agents/provider-meta';
+import { findKnownModel } from '../agents/provider-meta';
 import type { BudgetNotificationKey } from '../queries/budget.queries';
 import * as budgetQueries from '../queries/budget.queries';
 import * as memberBudgetQueries from '../queries/member-budget.queries';
@@ -220,7 +214,7 @@ function hasModelCost(
 	modelId: string,
 	declaredSources: Array<{ provider: LlmProvider; models: CustomModelMetadata[] }>,
 ): boolean {
-	const builtInModel = PROVIDER_META[providerKind(provider)].models.find((model) => model.id === modelId);
+	const builtInModel = findKnownModel(provider, modelId);
 	const declaredModel = declaredSources
 		.find((source) => source.provider === provider)
 		?.models.find((model) => model.id === modelId);

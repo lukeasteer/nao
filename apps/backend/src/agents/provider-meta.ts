@@ -5,6 +5,7 @@ import {
 	type ExtraParamKey,
 	mediaResolutionSchema,
 	type ModelCapabilities,
+	type ModelCosts,
 	type ParamControl,
 	type ProviderAuth,
 	type ProviderMetaMap,
@@ -157,7 +158,7 @@ const OPENAI_REASONING: ModelCapabilities = {
 const BEDROCK_GEO_PREFIXED_ID = /^[a-z]+(?:-[a-z]+)?\.([a-z0-9-]+\..+)$/;
 const BEDROCK_GEO_TWIN_PREFIXES = ['us', 'global'];
 
-type KnownModel = { id: string; capabilities?: ModelCapabilities };
+type KnownModel = { id: string; contextWindow?: number; costPerM?: ModelCosts; capabilities?: ModelCapabilities };
 
 /** Custom/unlisted OpenAI reasoning models: full effort surface incl. xhigh (e.g. Codex-Max variants). */
 const OPENAI_REASONING_CUSTOM: ModelCapabilities = {
@@ -1224,7 +1225,7 @@ export function getModelCapabilities(provider: LlmProvider, modelId: string): Mo
 	}
 }
 
-function findKnownModel(provider: LlmProvider, modelId: string): KnownModel | undefined {
+export function findKnownModel(provider: LlmProvider, modelId: string): KnownModel | undefined {
 	const models: readonly KnownModel[] = getProviderMeta(provider).models;
 	const exact = models.find((m) => m.id === modelId);
 	if (exact || providerKind(provider) !== 'bedrock') {
@@ -1235,7 +1236,8 @@ function findKnownModel(provider: LlmProvider, modelId: string): KnownModel | un
 
 /**
  * Bedrock inference profiles share a model across geo prefixes (`eu.`, `apac.`, `us-gov.`...), but the
- * catalog lists only some of them. An unlisted geo id takes the capabilities of its `us.` or `global.` twin.
+ * catalog lists only some of them. An unlisted geo id takes the capabilities, context window and prices of its
+ * `us.` or `global.` twin.
  */
 export function findBedrockGeoTwin(models: readonly KnownModel[], modelId: string): KnownModel | undefined {
 	const baseId = BEDROCK_GEO_PREFIXED_ID.exec(modelId)?.[1];
