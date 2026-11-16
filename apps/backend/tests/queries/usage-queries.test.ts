@@ -357,6 +357,63 @@ describe('usage query results', () => {
 		});
 	});
 
+	it('prices unlisted Bedrock geo ids from their listed twin in message and inference usage', async () => {
+		const now = new Date();
+		await db.insert(s.chatMessage).values([
+			{
+				id: 'geo-user',
+				chatId: CHAT_ID,
+				role: 'user',
+				source: 'web',
+				createdAt: new Date(now.getTime() - 1_000),
+			},
+			{
+				id: 'geo-assistant',
+				chatId: CHAT_ID,
+				role: 'assistant',
+				llmProvider: 'bedrock',
+				llmModelId: 'eu.anthropic.claude-sonnet-5-5',
+				inputNoCacheTokens: 1_000_000,
+				totalTokens: 1_000_000,
+				createdAt: now,
+			},
+		]);
+		await db.insert(s.llmInference).values([
+			{
+				id: 'geo-inference',
+				projectId: PROJECT_ID,
+				userId: USER_ID,
+				chatId: CHAT_ID,
+				type: 'compaction',
+				llmProvider: 'bedrock',
+				llmModelId: 'eu.anthropic.claude-sonnet-5',
+				inputNoCacheTokens: 1_000_000,
+				totalTokens: 1_000_000,
+				createdAt: now,
+			},
+			{
+				id: 'geo-inference-no-twin',
+				projectId: PROJECT_ID,
+				userId: USER_ID,
+				chatId: CHAT_ID,
+				type: 'compaction',
+				llmProvider: 'bedrock',
+				llmModelId: 'eu.anthropic.claude-future-9',
+				inputNoCacheTokens: 1_000_000,
+				totalTokens: 1_000_000,
+				createdAt: now,
+			},
+		]);
+		const filter = { period: { value: 15, unit: 'day' as const } };
+		const today = formatDate(now, 'day');
+
+		const record = (await getMessagesUsage(PROJECT_ID, filter)).find((item) => item.date === today);
+		const byUser = (await getMessagesUsageByUser(PROJECT_ID, filter)).find((item) => item.date === today);
+
+		expect(record?.totalCost).toBeCloseTo(4);
+		expect(byUser?.users.find((user) => user.userName === 'Usage User')?.totalCost).toBeCloseTo(4);
+	});
+
 	it('breaks down messages, tokens and cost per user for every date', async () => {
 		const now = new Date();
 		const previousDay = new Date(now);

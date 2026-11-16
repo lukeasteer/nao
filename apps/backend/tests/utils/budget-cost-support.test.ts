@@ -155,4 +155,19 @@ describe('getUnpricedModels', () => {
 
 		await expect(getUnpricedModels('project-1')).resolves.toEqual([]);
 	});
+
+	it('prices an unlisted Bedrock geo id from its listed twin and still flags one with no twin', async () => {
+		mocks.getProjectLlmConfigs.mockResolvedValue([
+			{
+				provider: 'bedrock',
+				enabledModels: ['eu.anthropic.claude-sonnet-5-5', 'eu.anthropic.claude-future-9'],
+				customModels: [],
+				baseUrl: null,
+			},
+		]);
+
+		await expect(getUnpricedModels('project-1')).resolves.toEqual([
+			expect.objectContaining({ provider: 'bedrock', modelId: 'eu.anthropic.claude-future-9' }),
+		]);
+	});
 });

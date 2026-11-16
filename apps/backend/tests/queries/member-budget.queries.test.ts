@@ -23,12 +23,14 @@ vi.mock('../../src/utils/llm', () => ({
 const PROJECT_ID = 'member-budget-project';
 const BUILT_IN_USER_ID = 'member-budget-built-in-user';
 const NAMED_PROVIDER_USER_ID = 'member-budget-named-provider-user';
+const BEDROCK_GEO_USER_ID = 'member-budget-bedrock-geo-user';
 
 describe('member budget spend', () => {
 	beforeAll(async () => {
 		await db.insert(s.user).values([
 			{ id: BUILT_IN_USER_ID, name: 'Built-in User', email: 'built-in@example.com' },
 			{ id: NAMED_PROVIDER_USER_ID, name: 'Named Provider User', email: 'named-provider@example.com' },
+			{ id: BEDROCK_GEO_USER_ID, name: 'Bedrock Geo User', email: 'bedrock-geo@example.com' },
 		]);
 		await db
 			.insert(s.project)
@@ -36,6 +38,7 @@ describe('member budget spend', () => {
 		await db.insert(s.chat).values([
 			{ id: 'built-in-chat', projectId: PROJECT_ID, userId: BUILT_IN_USER_ID },
 			{ id: 'named-provider-chat', projectId: PROJECT_ID, userId: NAMED_PROVIDER_USER_ID },
+			{ id: 'bedrock-geo-chat', projectId: PROJECT_ID, userId: BEDROCK_GEO_USER_ID },
 		]);
 		await db.insert(s.chatMessage).values([
 			{
@@ -66,6 +69,24 @@ describe('member budget spend', () => {
 				outputTotalTokens: 1_000_000,
 				createdAt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000),
 			},
+			{
+				id: 'bedrock-geo-message',
+				chatId: 'bedrock-geo-chat',
+				role: 'assistant',
+				llmProvider: 'bedrock',
+				llmModelId: 'eu.anthropic.claude-sonnet-5-5',
+				inputNoCacheTokens: 1_000_000,
+				outputTotalTokens: 1_000_000,
+			},
+			{
+				id: 'bedrock-no-twin-message',
+				chatId: 'bedrock-geo-chat',
+				role: 'assistant',
+				llmProvider: 'bedrock',
+				llmModelId: 'eu.anthropic.claude-future-9',
+				inputNoCacheTokens: 1_000_000,
+				outputTotalTokens: 1_000_000,
+			},
 		]);
 	});
 
@@ -73,10 +94,11 @@ describe('member budget spend', () => {
 		db.$client.close();
 	});
 
-	it('counts spend on named providers alongside built-in ones', async () => {
+	it('counts spend on named providers and unlisted Bedrock geo ids alongside built-in ones', async () => {
 		await expect(getPeriodCostsByUser(PROJECT_ID, 'month')).resolves.toEqual({
 			[BUILT_IN_USER_ID]: 6,
 			[NAMED_PROVIDER_USER_ID]: 2,
+			[BEDROCK_GEO_USER_ID]: 12,
 		});
 	});
 
